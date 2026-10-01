@@ -44,7 +44,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build index.json and README table
+      - name: Build index.json and README table (keep logos as separate files)
         shell: powershell
         run: .\tools\build-index.ps1
 

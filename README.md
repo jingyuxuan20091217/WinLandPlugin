@@ -2,8 +2,8 @@
 
 WinIsland（Windows 11 灵动岛）的社区插件仓库。
 
-WinIsland 的「设置 → 插件市场」只请求本仓库根目录的 **[index.json](./index.json)**：插件列表、版本、图标
-（内嵌 PNG）全在这一个文件里，整个列表**只发一次请求**；只有点「安装」时才下载对应的 `.lwp` 并校验 SHA-256。
+WinIsland 的「设置 → 插件市场」读取本仓库根目录的 **[index.json](./index.json)** 获取插件列表、版本和图标路径。
+Logo 作为独立 PNG 文件存储，索引不内嵌图片数据；只有点「安装」时才下载对应的 `.lwp` 并校验 SHA-256。
 
 清单由 GitHub Action 自动生成，**请勿手改 `index.json` 和下面的表格**。
 
@@ -23,7 +23,7 @@ WinIsland 的「设置 → 插件市场」只请求本仓库根目录的 **[inde
 
 ```
 WinLandPlugin/
-├── index.json                  ← 自动生成：客户端唯一数据源（含 sha256 / 体积 / 内嵌图标）
+├── index.json                  ← 自动生成：客户端数据源（含 sha256 / 体积 / logo 图片路径）
 ├── README.md                   ← 本文件（插件表格也由 Action 更新）
 ├── CONTRIBUTING.md             ← 投稿规范
 ├── tools/
@@ -87,8 +87,7 @@ PR 合并后 Action 会自动重建 `index.json` 与本文件的插件表格，�
 | `package` | 包在仓库内的相对路径 |
 | `package_size` / `sha256` | 包大小与哈希，下载后强制校验 |
 | `readme` | 说明文件相对路径（详情页按需拉取，列表阶段不请求） |
-| `logo` | 原图路径（供浏览器查看） |
-| `logo_data` | `data:image/png;base64,…` 缩略图标，随清单一次下发，避免逐插件请求 |
+| `logo` | 独立 logo 图片的相对路径；没有图片时为 `null` |
 | `updated_at` | 该插件目录最后一次提交时间 |
 
 ## 许可

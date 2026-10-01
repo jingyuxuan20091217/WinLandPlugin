@@ -8,11 +8,11 @@
         plugins/<id>/
           plugin.json      清单（id/name/version/entry_dll/api_version 必填，与包内那份一致）
           <id>.lwp         插件包（一个目录只允许一个 .lwp）
-          logo.png         可选，建议 240x240 透明 PNG（脚本会缩成 128x128 内嵌进 index.json）
+          logo.png         可选，建议 240x240 透明 PNG（index.json 只记录图片路径）
           README.md        可选，插件详细说明
 
     生成物：
-      index.json       客户端唯一数据源（含 sha256、体积、缩略 logo），整个市场列表只需一次请求
+      index.json       客户端数据源（含 sha256、体积和独立 logo 图片路径）
       README.md        人看的插件清单表格（替换 <!-- PLUGINS:START --> / <!-- PLUGINS:END --> 之间内容）
 
     校验不通过会以非 0 退出码结束，CI 里即视为失败。
@@ -32,7 +32,6 @@ if (-not $Root) { $Root = Split-Path -Parent $PSScriptRoot }
 $Root = (Resolve-Path $Root).Path
 $pluginsRoot = Join-Path $Root "plugins"
 
-$logoMaxBytes = 40960
 $logoSourceMaxBytes = 2MB
 $idPattern = '^[a-z0-9][a-z0-9-]{1,63}$'
 $skipNames = @(
@@ -58,22 +57,23 @@ function Get-RequiredString($manifest, [string]$field, [string]$where) {
     return "$value".Trim()
 }
 
-<#
-    把 logo.png 缩放成正方形缩略图并编码为 data URI：
-    先在 128x128 试，超过 40KB 就退到 96 / 64，保证 index.json 不会因为图标膨胀。
-#>
-function Convert-LogoToDataUri([string]$path, [string]$where) {
+function Test-Logo([string]$path, [string]$where) {
     $info = Get-Item $path
     if ($info.Length -gt $logoSourceMaxBytes) {
         Add-Error "$where 的 logo.png 过大（$([math]::Round($info.Length / 1KB)) KB），请先压缩到 1MB 以内"
-        return $null
+        return
+    }
+
+    if ($PSVersionTable.PSEdition -eq "Core" -and $PSVersionTable.Platform -eq "Unix") {
+        Add-Warning "非 Windows 平台无法校验 logo 图片格式"
+        return
     }
 
     try {
         Add-Type -AssemblyName System.Drawing -ErrorAction Stop
     } catch {
-        Add-Warning "无法加载 System.Drawing，已跳过 logo 缩略图（index.json 里不会有 logo_data）"
-        return $null
+        Add-Warning "无法加载 System.Drawing，已跳过 logo 图片格式校验"
+        return
     }
 
     $source = $null
@@ -81,50 +81,9 @@ function Convert-LogoToDataUri([string]$path, [string]$where) {
         $source = [System.Drawing.Image]::FromFile($info.FullName)
     } catch {
         Add-Error "$where 的 logo.png 不是有效的图片：$($_.Exception.Message)"
-        return $null
-    }
-
-    try {
-        foreach ($size in @(128, 96, 64)) {
-            $bitmap = New-Object System.Drawing.Bitmap($size, $size)
-            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-            try {
-                $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-                $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
-                $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-                $graphics.Clear([System.Drawing.Color]::Transparent)
-
-                $scale = [Math]::Min($size / $source.Width, $size / $source.Height)
-                $width = [int][Math]::Max(1, [Math]::Round($source.Width * $scale))
-                $height = [int][Math]::Max(1, [Math]::Round($source.Height * $scale))
-                $x = [int](($size - $width) / 2)
-                $y = [int](($size - $height) / 2)
-                $graphics.DrawImage($source, $x, $y, $width, $height)
-            } finally {
-                $graphics.Dispose()
-            }
-
-            $stream = New-Object System.IO.MemoryStream
-            try {
-                $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
-                $bytes = $stream.ToArray()
-            } finally {
-                $stream.Dispose()
-                $bitmap.Dispose()
-            }
-
-            if ($bytes.Length -le $logoMaxBytes -or $size -eq 64) {
-                if ($size -lt 128) {
-                    Add-Warning "$where 的 logo 已降采样到 ${size}x${size} 以控制清单体积（$([math]::Round($bytes.Length / 1KB)) KB）"
-                }
-                return "data:image/png;base64," + [Convert]::ToBase64String($bytes)
-            }
-        }
     } finally {
-        $source.Dispose()
+        if ($null -ne $source) { $source.Dispose() }
     }
-
-    return $null
 }
 
 function Get-GitDate([string]$relativePath) {
@@ -266,11 +225,10 @@ foreach ($directory in (Get-ChildItem $pluginsRoot -Directory | Sort-Object Name
     }
 
     $logoRelative = $null
-    $logoData = $null
     $logoPath = Join-Path $directory.FullName "logo.png"
     if (Test-Path $logoPath) {
         $logoRelative = "plugins/$folder/logo.png"
-        $logoData = Convert-LogoToDataUri $logoPath $where
+        Test-Logo $logoPath $where
     } else {
         Add-Warning "$where 没有 logo.png，市场里会退化成用 icon_glyph 显示"
     }
@@ -305,7 +263,6 @@ foreach ($directory in (Get-ChildItem $pluginsRoot -Directory | Sort-Object Name
         sha256           = $hash
         readme           = $readmeRelative
         logo             = $logoRelative
-        logo_data        = $logoData
         updated_at       = (Get-GitDate $packageRelative)
     }
 

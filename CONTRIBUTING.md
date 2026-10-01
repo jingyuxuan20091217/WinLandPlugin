@@ -9,7 +9,7 @@
 plugins/<id>/
   plugin.json      必填，和 .lwp 包内那份完全一致
   <id>.lwp         必填，插件包（zip 格式，扩展名 .lwp），一个目录只允许一个
-  logo.png         建议提供，240×240 透明 PNG，≤ 1 MB（Action 会缩成 128×128 内嵌进 index.json）
+  logo.png         建议提供，240×240 透明 PNG，≤ 1 MB（Action 在 index.json 中记录图片路径）
   README.md        可选，详情页展示的说明
 ```
 
