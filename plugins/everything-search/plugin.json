@@ -1,0 +1,17 @@
+{
+  "id": "everything-search",
+  "name": "Everything搜索",
+  "version": "1.1.3",
+  "entry_dll": "EverythingSearch.dll",
+  "api_version": 2,
+  "min_host_version": "2.3.0",
+  "description": "把 Everything 装进任务栏岛：点一下弹出搜索卡片，输入即搜、实时出结果，回车打开、Ctrl+回车定位。跟随岛体明暗配色。",
+  "author": "jingy",
+  "icon_glyph": "\uE721",
+  "license": "MIT",
+  "tags": ["search", "files", "productivity"]
+}
+
+
+
+
